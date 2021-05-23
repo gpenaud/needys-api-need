@@ -1,0 +1,48 @@
+version: "3.0"
+
+# --------------------------- #
+#          SERVICES           #
+# --------------------------- #
+
+services:
+  needys-api-need:
+    build: .
+    ports:
+      - 8010:8010
+    networks:
+      - needys
+
+  mariadb:
+    image: mariadb:10.5.1
+    hostname: db.needys.local
+    environment:
+      MYSQL_DATABASE: needys
+      MYSQL_ROOT_PASSWORD: needysroot
+      MYSQL_USER: needys
+      MYSQL_PASSWORD: needys
+    ports:
+      - 3306:3306
+    volumes:
+      - ./bootstrap.sql:/docker-entrypoint-initdb.d/bootstrap.sql
+    networks:
+      - needys
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-rabbitmq}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      - 5672:5672
+      - 15672:15672
+    networks:
+      - needys
+
+# --------------------------- #
+#           NETWORKS          #
+# --------------------------- #
+
+networks:
+  needys:
