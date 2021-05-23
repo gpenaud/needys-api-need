@@ -31,4 +31,4 @@ COPY --from=build /needys-api-need .
 
 EXPOSE 8010
 
-CMD ["./needys-api-need"]
+ENTRYPOINT ["./needys-api-need"]
