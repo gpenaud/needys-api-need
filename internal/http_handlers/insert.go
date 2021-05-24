@@ -1,13 +1,12 @@
-package handler
+package http_handlers
 
 import (
-  "fmt"
   "net/http"
   "encoding/json"
-  // "database/sql"
   _ "github.com/go-sql-driver/mysql"
   // local imports
-  "github.com/gpenaud/needys-api-need/internal/utils"
+  "github.com/gpenaud/needys-api-need/internal/mysql"
+  "github.com/gpenaud/needys-api-need/internal/rabbitmq_sender"
 )
 
 func InsertHandler(w http.ResponseWriter, r *http.Request) {
@@ -21,25 +20,15 @@ func InsertHandler(w http.ResponseWriter, r *http.Request) {
   name     := r.FormValue("name")
   priority := r.FormValue("priority")
 
-  query := fmt.Sprintf("INSERT INTO need (name, priority) VALUES ('%s', '%s')", name, priority)
-  fmt.Println(query)
+  mysql.InsertNeed(&name, &priority)
 
-  db := utils.DbConn()
-  _, err := db.Query(query)
-
+  json_healthy, err := json.MarshalIndent(*mysql.GetNeeds(), "", "  ")
   if err != nil {
     panic(err.Error())
   }
-
-  json_healthy, err := json.MarshalIndent(*utils.ShowAll(), "", "  ")
-  if err != nil {
-    panic(err.Error())
-  }
-
-  defer db.Close()
 
   w.Header().Set("Content-Type", "application/json")
   w.Write(json_healthy)
 
-  utils.SendAmqpMessages(json_healthy)
+  rabbitmq_sender.SendAmqpMessages(json_healthy)
 }

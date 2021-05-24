@@ -1,10 +1,10 @@
-package handler
+package http_handlers
 
 import (
   "net/http"
   "encoding/json"
   // local imports
-  "github.com/gpenaud/needys-api-need/internal/utils"
+  "github.com/gpenaud/needys-api-need/internal/mysql"
 )
 
 func ListHandler(w http.ResponseWriter, r *http.Request) {
@@ -13,7 +13,7 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  json_healthy, err := json.MarshalIndent(*utils.ShowAll(), "", "  ")
+  json_healthy, err := json.MarshalIndent(*mysql.GetNeeds(), "", "  ")
   if err != nil {
     panic(err.Error())
   }

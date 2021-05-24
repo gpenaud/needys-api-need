@@ -8,8 +8,8 @@ import (
   "os"
   "time"
   // local imports
-  "github.com/gpenaud/needys-api-need/internal/handler"
-  "github.com/gpenaud/needys-api-need/internal/models"
+  handler "github.com/gpenaud/needys-api-need/internal/http_handlers"
+  "github.com/gpenaud/needys-api-need/internal/config"
 )
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,23 +62,23 @@ func main() {
   cmdline.AddFlag("v", "verbose", "log more information")
   cmdline.Parse(os.Args)
 
-  models.Cfg.Server.Host = cmdline.OptionValue("server.host")
-  models.Cfg.Server.Port = cmdline.OptionValue("server.port")
+  config.Cfg.Server.Host = cmdline.OptionValue("server.host")
+  config.Cfg.Server.Port = cmdline.OptionValue("server.port")
 
-  models.Cfg.Mysql.Host = cmdline.OptionValue("mysql.host")
-  models.Cfg.Mysql.Port = cmdline.OptionValue("mysql.port")
-  models.Cfg.Mysql.Username = cmdline.OptionValue("mysql.username")
-  models.Cfg.Mysql.Password = cmdline.OptionValue("mysql.password")
-  models.Cfg.Mysql.Dbname = cmdline.OptionValue("mysql.dbname")
+  config.Cfg.Mysql.Host = cmdline.OptionValue("mysql.host")
+  config.Cfg.Mysql.Port = cmdline.OptionValue("mysql.port")
+  config.Cfg.Mysql.Username = cmdline.OptionValue("mysql.username")
+  config.Cfg.Mysql.Password = cmdline.OptionValue("mysql.password")
+  config.Cfg.Mysql.Dbname = cmdline.OptionValue("mysql.dbname")
 
-  models.Cfg.Rabbitmq.Host = cmdline.OptionValue("rabbitmq.host")
-  models.Cfg.Rabbitmq.Port = cmdline.OptionValue("rabbitmq.port")
-  models.Cfg.Rabbitmq.Username = cmdline.OptionValue("rabbitmq.username")
-  models.Cfg.Rabbitmq.Password = cmdline.OptionValue("rabbitmq.password")
+  config.Cfg.Rabbitmq.Host = cmdline.OptionValue("rabbitmq.host")
+  config.Cfg.Rabbitmq.Port = cmdline.OptionValue("rabbitmq.port")
+  config.Cfg.Rabbitmq.Username = cmdline.OptionValue("rabbitmq.username")
+  config.Cfg.Rabbitmq.Password = cmdline.OptionValue("rabbitmq.password")
 
   http.HandleFunc("/", defaultHandler)
 
-  server_address := fmt.Sprintf("%s:%s", models.Cfg.Server.Host, models.Cfg.Server.Port)
+  server_address := fmt.Sprintf("%s:%s", config.Cfg.Server.Host, config.Cfg.Server.Port)
   server := &http.Server{
     Addr:           server_address,
     ReadTimeout:    10 * time.Second,

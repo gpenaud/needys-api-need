@@ -1,4 +1,4 @@
-package models
+package config
 
 type Config struct {
   Server struct {
@@ -20,10 +20,4 @@ type Config struct {
     Username string `yaml:"username"`
     Password string `yaml:"password"`
   } `yaml:"rabbitmq"`
-}
-
-type Need struct {
-  Id       int
-  Name     string
-  Priority string
 }

@@ -1,17 +1,60 @@
 # needys-api-need
-API micro-service to manage Need objects
+An API micro-service for needys application to manage "need" objects.
+On "POST" curl request, the api send a message through a rabbitmq broker
+to trigger a pdf generation in another service: needys-output-producer
 
-## curl GET request example
-curl http://localhost:8010/load
+Please contact <guillaume.penaud@gmail.com> if you have questions !
 
-## curl PUT request example - 1
-curl -X PUT -H "Content-Type: application/json" -d '[{"id": 1, "firstname","albert": "lastname","einstein"}]' http://localhost:8010/register
+##### manage the compose stack
 
-## curl PUT request example - 2
-curl -X PUT -H "Content-Type: application/json" -d '[{"id": 1, "firstname","albert": "lastname","einstein"}, {"id": 2, "firstname","isaac": "lastname","newton"}, {"id": 3, "firstname","marie": "lastname","curie"}]' http://localhost:8010/register
+```
+### to start it
+docker-compose up --detach
+OR
+make start
 
-## curl POST request example
-curl -X POST -H "Content-Type: application/json" -d '{"firstname","aurélien": "lastname","barrault"}' http://localhost:8010/add
+### to stop it
+docker-compose down
+OR
+make stop
+```
 
-## curl DELETE request example
-curl -X DELETE -H "Content-Type: application/json" -d '{"id": 4}' http://localhost:8010/delete
+##### to start only a part of the stack
+```
+### only the api part
+docker-compose up needys-api-need
+OR
+make api-only
+
+### only the sidecars part
+docker-compose up mariadb rabbitmq
+OR
+make sidecars-only
+```
+
+##### possible tests for the api
+Thoses tests are covering every usage of the api needys-api-need. Use them
+to validate both mysql and rabbitmq usage
+
+```
+### list database content
+curl -X GET http://localhost:8010
+OR
+make test-list
+
+### delete entries matching "testing-need" as name, then insert one into database
+curl -X DELETE http://localhost:8010?name=testing-need
+curl -d "name=testing-need&priority=high" -X POST http://localhost:8010
+OR
+make test-all
+
+### only delete entries matching "testing-need" as name from database
+curl -X DELETE http://localhost:8010?name=testing-need
+OR
+make test-delete
+
+### only insert one entry "testing-need" in database
+curl -d "name=testing-need&priority=high" -X POST http://localhost:8010
+OR
+test-insert
+```

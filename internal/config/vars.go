@@ -1,3 +1,3 @@
-package models
+package config
 
 var Cfg Config
