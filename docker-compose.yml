@@ -1,16 +1,25 @@
 version: "3.0"
 
-# --------------------------- #
-#          SERVICES           #
-# --------------------------- #
+networks:
+  needys-api-need:
 
 services:
   needys-api-need:
-    build: .
+    container_name: needys-api-need
+    build:
+      context: .
+      dockerfile: Dockerfile.development
     ports:
       - 8010:8010
+    volumes:
+      - ./:/application
     networks:
-      - needys
+      - needys-api-need
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   mariadb:
     image: mariadb:10.5.1
@@ -21,11 +30,11 @@ services:
       MYSQL_USER: needys
       MYSQL_PASSWORD: needys
     ports:
-      - 3306:3306
+      - 3306
     volumes:
       - ./bootstrap.sql:/docker-entrypoint-initdb.d/bootstrap.sql
     networks:
-      - needys
+      - needys-api-need
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -34,14 +43,7 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     ports:
-      - 5672:5672
-      - 15672:15672
+      - 5672
+      - 15672
     networks:
-      - needys
-
-# --------------------------- #
-#           NETWORKS          #
-# --------------------------- #
-
-networks:
-  needys:
+      - needys-api-need

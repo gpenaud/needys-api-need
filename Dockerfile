@@ -7,14 +7,30 @@ RUN \
   apk add --no-cache git &&\
   mkdir /application
 
-ADD . /application/
 WORKDIR /application
+ADD . /application
 
 # Download all the dependencies
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=linux \
-  go build \
-    -a -installsuffix cgo \
+
+# Set build argument variables for build
+ARG PROJECT
+ARG RELEASE
+ARG COMMIT
+ARG BUILD_TIME
+
+# Set environment variable
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+
+# Build the binary
+RUN go build \
+  -a \
+  -installsuffix cgo \
+  -ldflags "-s -w \
+    -X ${PROJECT}/build/version.Release=${RELEASE} \
+    -X ${PROJECT}/build/version.Commit=${COMMIT} \
+    -X ${PROJECT}/build/version.BuildTime=${BUILD_TIME}" \
     -o /needys-api-need \
   /application/cmd/needys-api-need-server/main.go
 
