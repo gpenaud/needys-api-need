@@ -1,18 +1,29 @@
 package main
 
 import (
+  "context"
   "fmt"
   "github.com/galdor/go-cmdline"
-  "log"
   "net/http"
   "os"
+  "os/signal"
+  "syscall"
   "time"
-  // local imports
+  // local import
   handler "github.com/gpenaud/needys-api-need/internal/http_handlers"
   "github.com/gpenaud/needys-api-need/internal/config"
+  "github.com/gpenaud/needys-api-need/pkg/log"
+  "github.com/gpenaud/needys-api-need/build/version"
 )
 
+var Version = "development"
+
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
+  if (r.URL.Path != "/") {
+    http.Error(w, "404 not found.", http.StatusNotFound)
+    return
+  }
+
   switch r.Method {
   case http.MethodGet:
     handler.ListHandler(w, r)
@@ -30,7 +41,11 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-  fmt.Printf("starting needys-api-need at port 8010\n")
+
+  fmt.Printf(
+    "Starting needys-api-need at port 8010...\n > build time: %s\n > release: %s\n > commit: %s\n",
+    version.BuildTime, version.Release, version.Commit,
+  )
 
   cmdline := cmdline.New()
 
@@ -76,7 +91,13 @@ func main() {
   config.Cfg.Rabbitmq.Username = cmdline.OptionValue("rabbitmq.username")
   config.Cfg.Rabbitmq.Password = cmdline.OptionValue("rabbitmq.password")
 
+  http.HandleFunc("/version", handler.VersionHandler)
+  http.HandleFunc("/health", handler.HealthHandler)
+  http.HandleFunc("/ready", handler.ReadyHandler)
   http.HandleFunc("/", defaultHandler)
+
+  interrupt := make(chan os.Signal, 1)
+  signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
   server_address := fmt.Sprintf("%s:%s", config.Cfg.Server.Host, config.Cfg.Server.Port)
   server := &http.Server{
@@ -86,5 +107,21 @@ func main() {
     MaxHeaderBytes: 1 << 20,
   }
 
-  log.Fatal(server.ListenAndServe())
+  go func() {
+    log.ErrorLogger.Fatalln(server.ListenAndServe())
+  }()
+
+  killSignal := <-interrupt
+
+  switch killSignal {
+  case os.Interrupt:
+    log.WarningLogger.Println("Received SIGINT...")
+  case syscall.SIGTERM:
+    log.WarningLogger.Println("Received SIGTERM...")
+  }
+
+  log.InfoLogger.Println("The service is shutting down...")
+  server.Shutdown(context.Background())
+  log.InfoLogger.Println("...Shutting done !")
 }
+

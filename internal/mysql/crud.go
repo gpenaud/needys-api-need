@@ -39,6 +39,7 @@ func InsertNeed(name *string, priority *string) {
 }
 
 func GetNeeds() *[]objects.Need {
+  log.InfoLogger.Println("List needs")
   db := utils_mysql.DbConn()
   selDB, err := db.Query("SELECT * FROM need ORDER BY id ASC")
 

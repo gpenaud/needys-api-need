@@ -1,5 +1,12 @@
-## HELP
-PROJECT           = needys-api-need
+## permanent variables
+PROJECT			?= github.com/gpenaud/needys-api-need
+RELEASE			?= $(shell git describe --tags --abbrev=0)
+COMMIT			?= $(shell git rev-parse --short HEAD)
+BUILD_TIME  ?= $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+
+## docker environment options
+DOCKER_BUILD_ARGS ?= --build-arg PROJECT="${PROJECT}" --build-arg RELEASE="${RELEASE}" --build-arg COMMIT="${COMMIT}" --build-arg BUILD_TIME="${BUILD_TIME}"
+
 ## Colors
 COLOR_RESET       = $(shell tput sgr0)
 COLOR_ERROR       = $(shell tput setaf 1)
@@ -26,7 +33,7 @@ help:
 ## stack - start the entire stack in background, then follow logs
 start:
 	docker-compose up --build --detach
-	docker-compose logs --follow
+	docker-compose logs --follow needys-api-need
 
 ## stack - stop the entire stack
 stop:
@@ -41,12 +48,13 @@ sidecars-only:
 	docker-compose up mariadb rabbitmq
 
 ## docker - build the needys-api-need image
+.PHONY: build
 build:
-	docker build -t needys-api-need:latest .
+	docker build ${DOCKER_BUILD_ARGS} --file Dockerfile --tag needys-api-need:latest .
 
 ## docker - enter into the needys-api-need container
 enter:
-	docker-compose exec -it needys-api-need /bin/sh
+	docker-compose exec needys-api-need /bin/sh
 
 ## test - display all "need" table entries
 test-list:
