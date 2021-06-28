@@ -28,9 +28,9 @@ RUN go build \
   -a \
   -installsuffix cgo \
   -ldflags "-s -w \
-    -X ${PROJECT}/build/version.Release=${RELEASE} \
-    -X ${PROJECT}/build/version.Commit=${COMMIT} \
-    -X ${PROJECT}/build/version.BuildTime=${BUILD_TIME}" \
+    -X main.Release=${RELEASE} \
+    -X main.Commit=${COMMIT} \
+    -X main.BuildTime=${BUILD_TIME}" \
     -o /needys-api-need \
   /application/cmd/needys-api-need-server/main.go
 

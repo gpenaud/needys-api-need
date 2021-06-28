@@ -2,7 +2,7 @@
 
 # Working directory
 # . or absolute path, please note that the directories following must be under root
-root = "." 
+root = "."
 tmp_dir = "/tmp"
 
 [build]
@@ -14,7 +14,7 @@ bin = "tmp/app"
 
 # Customize binary.
 # This is how you start to run your application. Since my application will works like CLI, so to run it, like to make a CLI call.
-full_bin = "./needys-api-need --server.host 0.0.0.0 --rabbitmq.host rabbitmq --mysql.host mariadb"
+full_bin = "./needys-api-need --server.host 0.0.0.0 --rabbitmq.host rabbitmq --database.host mariadb"
 
 # This log file places in your tmp_dir.
 log = "air_errors.log"

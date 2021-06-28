@@ -1,33 +1,39 @@
-package rabbitmq_sender
+package internal
 
 import (
-  "fmt"
-	"github.com/streadway/amqp"
-  // local packages
-  // "github.com/gpenaud/needys-api-need/internal/models"
-  "github.com/gpenaud/needys-api-need/internal/config"
-  "github.com/gpenaud/needys-api-need/pkg/log"
+  amqp "github.com/streadway/amqp"
+  fmt  "fmt"
+  log  "github.com/sirupsen/logrus"
 )
 
-func SendAmqpMessages(message []byte) {
+var amqpLog *log.Entry
+
+func init() {
+  amqpLog = log.WithFields(log.Fields{
+    "_file": "internal/amqp.go",
+    "_type": "messaging",
+  })
+}
+
+func (a* Application) SendAmqpMessages(message []byte) {
   rabbitmq_connection_parameters := fmt.Sprintf(
     "amqp://%s:%s@%s:%s/",
-    config.Cfg.Rabbitmq.Username,
-    config.Cfg.Rabbitmq.Password,
-    config.Cfg.Rabbitmq.Host,
-    config.Cfg.Rabbitmq.Port,
+    a.Config.Rabbitmq.Username,
+    a.Config.Rabbitmq.Password,
+    a.Config.Rabbitmq.Host,
+    a.Config.Rabbitmq.Port,
   )
 
   conn, err := amqp.Dial(rabbitmq_connection_parameters)
   if err != nil {
-    log.ErrorLogger.Fatalln("Failed to close RabbitMQ")
+    amqpLog.Fatal("Failed to close RabbitMQ")
   }
 
 	defer conn.Close()
 
 	ch, err := conn.Channel()
   if err != nil {
-    log.ErrorLogger.Fatalln("Failed to close the channel")
+    amqpLog.Fatal("Failed to close the channel")
   }
 
 	defer ch.Close()
@@ -42,7 +48,7 @@ func SendAmqpMessages(message []byte) {
 	)
 
   if err != nil {
-    log.ErrorLogger.Fatalln("Failed to declare a queue")
+    amqpLog.Fatal("Failed to declare a queue")
   }
 
 	err = ch.Publish(
@@ -57,8 +63,8 @@ func SendAmqpMessages(message []byte) {
   )
 
   if err != nil {
-    log.ErrorLogger.Fatalln("Failed to publish a message")
+    amqpLog.Fatal("Failed to publish a message")
   }
 
-  log.InfoLogger.Printf(" [x] Sent %s", message)
+  amqpLog.Info(" [x] Sent %s", message)
 }

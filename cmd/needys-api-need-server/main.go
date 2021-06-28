@@ -1,127 +1,136 @@
 package main
 
 import (
-  "context"
-  "fmt"
-  "github.com/galdor/go-cmdline"
-  "net/http"
-  "os"
-  "os/signal"
-  "syscall"
-  "time"
-  // local import
-  handler "github.com/gpenaud/needys-api-need/internal/http_handlers"
-  "github.com/gpenaud/needys-api-need/internal/config"
-  "github.com/gpenaud/needys-api-need/pkg/log"
-  "github.com/gpenaud/needys-api-need/build/version"
+  cmdline  "github.com/galdor/go-cmdline"
+  context  "context"
+  internal "github.com/gpenaud/needys-api-need/internal"
+  log      "github.com/sirupsen/logrus"
+  os       "os"
+  signal   "os/signal"
+  syscall  "syscall"
 )
 
-var Version = "development"
-
-func defaultHandler(w http.ResponseWriter, r *http.Request) {
-  if (r.URL.Path != "/") {
-    http.Error(w, "404 not found.", http.StatusNotFound)
-    return
-  }
-
-  switch r.Method {
-  case http.MethodGet:
-    handler.ListHandler(w, r)
-  case http.MethodPost:
-    handler.InsertHandler(w, r)
-  case http.MethodPut:
-      // Update an existing record.
-  case http.MethodDelete:
-    handler.DeleteHandler(w, r)
-  default:
-    http.Error(w, "404 not found.", http.StatusNotFound)
-  }
-
-  return
-}
-
-func main() {
-
-  fmt.Printf(
-    "Starting needys-api-need at port 8010...\n > build time: %s\n > release: %s\n > commit: %s\n",
-    version.BuildTime, version.Release, version.Commit,
-  )
-
+func registerCliConfiguration(a *internal.Application) {
   cmdline := cmdline.New()
 
+  a.Config = &internal.Configuration{}
+
+  // application configuration flags
+  cmdline.AddOption("e", "environment", "ENVIRONMENT", "the current environment (development, integration, production)")
+  cmdline.SetOptionDefault("environment", "production")
+
+  cmdline.AddOption("v", "verbosity", "LEVEL", "verbosity for log-level (error, warning, info, debug)")
+  cmdline.SetOptionDefault("verbosity", "info")
+
+  cmdline.AddOption("l", "log-format", "FORMAT", "log format (text, json)")
+  cmdline.SetOptionDefault("log-format", "unset")
+
+  cmdline.AddFlag("", "log-healthcheck", "log healthcheck queries")
+
+  // application server configuration flags
   cmdline.AddOption("", "server.host", "HOST", "host of application")
   cmdline.SetOptionDefault("server.host", "localhost")
+
   cmdline.AddOption("", "server.port", "PORT", "port of application")
   cmdline.SetOptionDefault("server.port", "8010")
 
-  cmdline.AddOption("", "mysql.host", "HOST", "host of the MySQL server")
-  cmdline.SetOptionDefault("mysql.host", "127.0.0.1")
-  cmdline.AddOption("", "mysql.port", "PORT", "port of the MySQL server")
-  cmdline.SetOptionDefault("mysql.port", "3306")
-  cmdline.AddOption("", "mysql.username", "USERNAME", "username of MySQL server")
-  cmdline.SetOptionDefault("mysql.username", "needys")
-  cmdline.AddOption("", "mysql.password", "PASSWORD", "password of the MySQL user")
-  cmdline.SetOptionDefault("mysql.password", "needys")
-  cmdline.AddOption("", "mysql.dbname", "DB_NAME", "the database name")
-  cmdline.SetOptionDefault("mysql.dbname", "needys")
+  // db configuration flags
+  cmdline.AddOption("", "database.host", "HOST", "host of the MySQL server")
+  cmdline.SetOptionDefault("database.host", "127.0.0.1")
 
+  cmdline.AddOption("", "database.port", "PORT", "port of the MySQL server")
+  cmdline.SetOptionDefault("database.port", "3306")
+
+  cmdline.AddOption("", "database.username", "USERNAME", "username of MySQL server")
+  cmdline.SetOptionDefault("database.username", "needys")
+
+  cmdline.AddOption("", "database.password", "PASSWORD", "password of the MySQL user")
+  cmdline.SetOptionDefault("database.password", "needys")
+
+  cmdline.AddOption("", "database.name", "DB_NAME", "the database name")
+  cmdline.SetOptionDefault("database.name", "needys")
+
+  // rabbitmq configuration flags
   cmdline.AddOption("", "rabbitmq.host", "HOST", "host of the rabbitMQ server")
   cmdline.SetOptionDefault("rabbitmq.host", "127.0.0.1")
+
   cmdline.AddOption("", "rabbitmq.port", "PORT", "port of the rabbitMQ server")
   cmdline.SetOptionDefault("rabbitmq.port", "5672")
+
   cmdline.AddOption("", "rabbitmq.username", "USERNAME", "username of rabbitMQ server")
   cmdline.SetOptionDefault("rabbitmq.username", "guest")
+
   cmdline.AddOption("", "rabbitmq.password", "PASSWORD", "password of the rabbitMQ user")
   cmdline.SetOptionDefault("rabbitmq.password", "guest")
 
   cmdline.AddFlag("v", "verbose", "log more information")
   cmdline.Parse(os.Args)
 
-  config.Cfg.Server.Host = cmdline.OptionValue("server.host")
-  config.Cfg.Server.Port = cmdline.OptionValue("server.port")
+  // application general configuration
+  a.Config.Environment    = cmdline.OptionValue("environment")
+  a.Config.Verbosity      = cmdline.OptionValue("verbosity")
+  a.Config.LogFormat      = cmdline.OptionValue("log-format")
+  a.Config.LogHealthcheck = cmdline.IsOptionSet("log-healthcheck")
 
-  config.Cfg.Mysql.Host = cmdline.OptionValue("mysql.host")
-  config.Cfg.Mysql.Port = cmdline.OptionValue("mysql.port")
-  config.Cfg.Mysql.Username = cmdline.OptionValue("mysql.username")
-  config.Cfg.Mysql.Password = cmdline.OptionValue("mysql.password")
-  config.Cfg.Mysql.Dbname = cmdline.OptionValue("mysql.dbname")
+  // a server configuration values
+  a.Config.Server.Host = cmdline.OptionValue("server.host")
+  a.Config.Server.Port = cmdline.OptionValue("server.port")
 
-  config.Cfg.Rabbitmq.Host = cmdline.OptionValue("rabbitmq.host")
-  config.Cfg.Rabbitmq.Port = cmdline.OptionValue("rabbitmq.port")
-  config.Cfg.Rabbitmq.Username = cmdline.OptionValue("rabbitmq.username")
-  config.Cfg.Rabbitmq.Password = cmdline.OptionValue("rabbitmq.password")
+  // database configuration value
+  a.Config.Database.Host     = cmdline.OptionValue("database.host")
+  a.Config.Database.Port     = cmdline.OptionValue("database.port")
+  a.Config.Database.Name     = cmdline.OptionValue("database.name")
+  a.Config.Database.Username = cmdline.OptionValue("database.username")
+  a.Config.Database.Password = cmdline.OptionValue("database.password")
 
-  http.HandleFunc("/version", handler.VersionHandler)
-  http.HandleFunc("/health", handler.HealthHandler)
-  http.HandleFunc("/ready", handler.ReadyHandler)
-  http.HandleFunc("/", defaultHandler)
-
-  interrupt := make(chan os.Signal, 1)
-  signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
-
-  server_address := fmt.Sprintf("%s:%s", config.Cfg.Server.Host, config.Cfg.Server.Port)
-  server := &http.Server{
-    Addr:           server_address,
-    ReadTimeout:    10 * time.Second,
-    WriteTimeout:   10 * time.Second,
-    MaxHeaderBytes: 1 << 20,
-  }
-
-  go func() {
-    log.ErrorLogger.Fatalln(server.ListenAndServe())
-  }()
-
-  killSignal := <-interrupt
-
-  switch killSignal {
-  case os.Interrupt:
-    log.WarningLogger.Println("Received SIGINT...")
-  case syscall.SIGTERM:
-    log.WarningLogger.Println("Received SIGTERM...")
-  }
-
-  log.InfoLogger.Println("The service is shutting down...")
-  server.Shutdown(context.Background())
-  log.InfoLogger.Println("...Shutting done !")
+  // rabitmq configuration value
+  a.Config.Rabbitmq.Host     = cmdline.OptionValue("rabbitmq.host")
+  a.Config.Rabbitmq.Port     = cmdline.OptionValue("rabbitmq.port")
+  a.Config.Rabbitmq.Username = cmdline.OptionValue("rabbitmq.username")
+  a.Config.Rabbitmq.Password = cmdline.OptionValue("rabbitmq.password")
 }
 
+var BuildTime = "unset"
+var Commit 		= "unset"
+var Release 	= "unset"
+
+func registerVersion(a *internal.Application) {
+  a.Version = &internal.Version{BuildTime, Commit, Release}
+}
+
+var mainLog *log.Entry
+var a        internal.Application
+
+func init() {
+  mainLog = log.WithFields(log.Fields{
+    "_file": "cmd/needys-api-need-server/main.go",
+    "_type": "system",
+  })
+
+  registerCliConfiguration(&a)
+  registerVersion(&a)
+
+  a.Initialize()
+}
+
+func main() {
+  c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+  go func() {
+		oscall := <-c
+
+    mainLog.WithFields(log.Fields{
+      "signal": oscall,
+    }).Warn("received a system call")
+
+    a.DB.Close()
+    a.AMQP.Close()
+
+		cancel()
+	}()
+
+  a.Run(ctx)
+}

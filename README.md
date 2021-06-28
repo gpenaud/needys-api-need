@@ -58,3 +58,7 @@ curl -d "name=testing-need&priority=high" -X POST http://localhost:8010
 OR
 test-insert
 ```
+
+### Tricks for container debug
+
+# CMD exec /bin/bash -c "trap : TERM INT; sleep infinity & wait"

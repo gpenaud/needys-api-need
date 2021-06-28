@@ -7,12 +7,12 @@ services:
   needys-api-need:
     container_name: needys-api-need
     build:
-      context: .
-      dockerfile: Dockerfile.development
+      context: ../
+      dockerfile: build/package/Dockerfile.development
     ports:
       - 8010:8010
     volumes:
-      - ./:/application
+      - ./../:/application
     networks:
       - needys-api-need
     healthcheck:
@@ -20,6 +20,21 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  needys-api-need-initialize-db:
+    container_name: needys-api-need-initialize-db
+    image: curlimages/curl:7.77.0
+    command: --silent --fail --retry 60 --retry-delay 3 --retry-connrefused http://needys-api-need:8012/initialize_db
+    networks:
+      - needys-api-need
+    depends_on:
+      - needys-api-need
+    restart: on-failure
+    healthcheck:
+      test: curl --fail http://needys-api-need:8012/ready || exit 1
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   mariadb:
     image: mariadb:10.5.1
@@ -30,9 +45,7 @@ services:
       MYSQL_USER: needys
       MYSQL_PASSWORD: needys
     ports:
-      - 3306
-    volumes:
-      - ./bootstrap.sql:/docker-entrypoint-initdb.d/bootstrap.sql
+      - 3306:3306
     networks:
       - needys-api-need
 
@@ -43,7 +56,7 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
     ports:
-      - 5672
-      - 15672
+      - 5672:5672
+      - 15672:15672
     networks:
       - needys-api-need

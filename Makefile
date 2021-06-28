@@ -7,6 +7,9 @@ BUILD_TIME  ?= $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 ## docker environment options
 DOCKER_BUILD_ARGS ?= --build-arg PROJECT="${PROJECT}" --build-arg RELEASE="${RELEASE}" --build-arg COMMIT="${COMMIT}" --build-arg BUILD_TIME="${BUILD_TIME}"
 
+## docker-compose options
+DOCKER_COMPOSE_OPTIONS ?= --file deployments/docker-compose.yml
+
 ## Colors
 COLOR_RESET       = $(shell tput sgr0)
 COLOR_ERROR       = $(shell tput setaf 1)
@@ -32,43 +35,46 @@ help:
 
 ## stack - start the entire stack in background, then follow logs
 start:
-	docker-compose up --build --detach
-	docker-compose logs --follow needys-api-need
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow needys-api-need
+
+only-application:
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach needys-api-need needys-api-need-initialize-db
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow needys-api-need needys-api-need-initialize-db
+
+only-services:
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach postgres
 
 ## stack - stop the entire stack
 stop:
-	docker-compose down
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} down
 
-## stack - only start the api "needys-api-need"
-api-only:
-	docker-compose up needys-api-need
+## stack - watch the stack
+watch:
+	watch docker-compose ${DOCKER_COMPOSE_OPTIONS} ps
 
-## stack - only start the sidecars backends (rabbitmq here)
-sidecars-only:
-	docker-compose up mariadb rabbitmq
+## stack - log the entire stack
+logs:
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow
+
+## test - execute all api queries to check results on bash
+.PHONY: test
+test:
+	/bin/sh scripts/test-api.sh --query
+
+## test - execute all unit-tests defined in application
+test-unit:
+	@echo "Stricts unit-tests are not yet implemented !"
+
+## test - execute all cucumber-behavior tests defined in application
+test-behavior:
+	go test -v ./... --godog.format=pretty --godog.random -race -covermode=atomic
 
 ## docker - build the needys-api-need image
 .PHONY: build
 build:
-	docker build ${DOCKER_BUILD_ARGS} --file Dockerfile --tag needys-api-need:latest .
+	docker build ${DOCKER_BUILD_ARGS} --file build/package/Dockerfile --tag needys-api-need:latest .
 
 ## docker - enter into the needys-api-need container
 enter:
-	docker-compose exec needys-api-need /bin/sh
-
-## test - display all "need" table entries
-test-list:
-	curl -X GET http://localhost:8010
-
-## test - remove, then insert a need entry named "testing-need" in need table
-test-all:
-	curl -X DELETE http://localhost:8010?name=testing-need
-	curl -d "name=testing-need&priority=high" -X POST http://localhost:8010
-
-## test - remove all entries filtered by name "testing-need" from need table
-test-delete:
-	curl -X DELETE http://localhost:8010?name=testing-need
-
-## test - insert a need entry named "testing-need" in need table
-test-insert:
-	curl -d "name=testing-need&priority=high" -X POST http://localhost:8010
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} exec needys-api-need /bin/sh
