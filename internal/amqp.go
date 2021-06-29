@@ -18,10 +18,10 @@ func init() {
 func (a* Application) SendAmqpMessages(message []byte) {
   rabbitmq_connection_parameters := fmt.Sprintf(
     "amqp://%s:%s@%s:%s/",
-    a.Config.Rabbitmq.Username,
-    a.Config.Rabbitmq.Password,
-    a.Config.Rabbitmq.Host,
-    a.Config.Rabbitmq.Port,
+    a.Config.Messaging.Username,
+    a.Config.Messaging.Password,
+    a.Config.Messaging.Host,
+    a.Config.Messaging.Port,
   )
 
   conn, err := amqp.Dial(rabbitmq_connection_parameters)

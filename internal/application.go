@@ -43,7 +43,7 @@ func (a *Application) initializeLogger() {
   }
 
   // if log format is specified, configure it, else we base our choice on the environment
-  if a.Config.LogFormat != "" {
+  if a.Config.LogFormat != "unset" {
     log.SetFormatter(LogFormatters[a.Config.LogFormat])
   } else {
     log.SetFormatter(LogFormatters[a.Config.Environment])
@@ -79,11 +79,12 @@ type Configuration struct {
     Password string
     Name string
   }
-  Rabbitmq struct {
+  Messaging struct {
     Port string
     Host string
     Username string
     Password string
+    Vhost string
   }
 }
 
@@ -107,10 +108,10 @@ type Application struct {
 func (a* Application) initializeMessagingConnection() {
   amqp_connection_parameters := fmt.Sprintf(
     "amqp://%s:%s@%s:%s/",
-    a.Config.Rabbitmq.Username,
-    a.Config.Rabbitmq.Password,
-    a.Config.Rabbitmq.Host,
-    a.Config.Rabbitmq.Port,
+    a.Config.Messaging.Username,
+    a.Config.Messaging.Password,
+    a.Config.Messaging.Host,
+    a.Config.Messaging.Port,
   )
 
   var err error
