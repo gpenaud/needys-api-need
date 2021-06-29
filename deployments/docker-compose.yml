@@ -24,14 +24,14 @@ services:
   needys-api-need-initialize-db:
     container_name: needys-api-need-initialize-db
     image: curlimages/curl:7.77.0
-    command: --silent --fail --retry 60 --retry-delay 3 --retry-connrefused http://needys-api-need:8012/initialize_db
+    command: --silent --fail --retry 60 --retry-delay 3 --retry-connrefused http://needys-api-need:8010/initialize_db
     networks:
       - needys-api-need
     depends_on:
       - needys-api-need
     restart: on-failure
     healthcheck:
-      test: curl --fail http://needys-api-need:8012/ready || exit 1
+      test: curl --fail http://needys-api-need:8010/ready || exit 1
       interval: 3s
       timeout: 3s
       retries: 10
@@ -52,6 +52,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     environment:
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_DEFAULT_VHOST:-needys}
       RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE:-rabbitmq}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}

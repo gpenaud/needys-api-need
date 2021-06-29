@@ -10,6 +10,35 @@ import (
   syscall  "syscall"
 )
 
+var mainLog *log.Entry
+var a        internal.Application
+
+func init() {
+  mainLog = log.WithFields(log.Fields{
+    "_file": "cmd/needys-api-need-server/main.go",
+    "_type": "system",
+  })
+
+  registerCliConfiguration(&a)
+  registerVersion(&a)
+
+  a.Initialize()
+}
+
+var PossibleOptionValues = map[string][]string{
+  "environment": {"development", "integration", "production"},
+  "verbosity": {"error", "warning", "info", "debug"},
+  "log-format": {"text", "json"},
+}
+
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str { return true }
+	}
+
+	return false
+}
+
 func registerCliConfiguration(a *internal.Application) {
   cmdline := cmdline.New()
 
@@ -67,9 +96,32 @@ func registerCliConfiguration(a *internal.Application) {
   cmdline.Parse(os.Args)
 
   // application general configuration
-  a.Config.Environment    = cmdline.OptionValue("environment")
-  a.Config.Verbosity      = cmdline.OptionValue("verbosity")
-  a.Config.LogFormat      = cmdline.OptionValue("log-format")
+  if (! contains(PossibleOptionValues["environment"], cmdline.OptionValue("environment"))) {
+    mainLog.WithFields(log.Fields{
+      "environment": a.Config.Environment,
+    }).Fatal("Wrong value for option environment")
+  } else {
+    a.Config.Environment = cmdline.OptionValue("environment")
+  }
+
+  if (! contains(PossibleOptionValues["verbosity"], cmdline.OptionValue("verbosity"))) {
+    mainLog.WithFields(log.Fields{
+      "verbosity": a.Config.Verbosity,
+    }).Fatal("Wrong value for option verbosity")
+  } else {
+    a.Config.Verbosity = cmdline.OptionValue("verbosity")
+  }
+
+  if (cmdline.OptionValue("log-format") != "unset") {
+    if (! contains(PossibleOptionValues["log-format"], cmdline.OptionValue("log-format"))) {
+      mainLog.WithFields(log.Fields{
+        "log-format": a.Config.LogFormat,
+      }).Fatal("Wrong value for option log-format")
+    } else {
+      a.Config.LogFormat = cmdline.OptionValue("log-format")
+    }
+  }
+
   a.Config.LogHealthcheck = cmdline.IsOptionSet("log-healthcheck")
 
   // a server configuration values
@@ -96,21 +148,6 @@ var Release 	= "unset"
 
 func registerVersion(a *internal.Application) {
   a.Version = &internal.Version{BuildTime, Commit, Release}
-}
-
-var mainLog *log.Entry
-var a        internal.Application
-
-func init() {
-  mainLog = log.WithFields(log.Fields{
-    "_file": "cmd/needys-api-need-server/main.go",
-    "_type": "system",
-  })
-
-  registerCliConfiguration(&a)
-  registerVersion(&a)
-
-  a.Initialize()
 }
 
 func main() {

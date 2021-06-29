@@ -1,20 +1,27 @@
 package internal
 
 import (
-  fmt  "fmt"
-  http "net/http"
-  json "encoding/json"
-  log  "github.com/sirupsen/logrus"
-  need "github.com/gpenaud/needys-api-need/internal/need"
+  fmt     "fmt"
+  http    "net/http"
+  json    "encoding/json"
+  log     "github.com/sirupsen/logrus"
+  need    "github.com/gpenaud/needys-api-need/internal/need"
+  runtime "runtime"
+  strings "strings"
 )
 
 var handlerLog *log.Entry
 
 func init() {
-  handlerLog = log.WithFields(log.Fields{
-    "_file": "internal/handler.go",
-    "_type": "router",
-  })
+  log.SetReportCaller(true)
+  if pc, file, line, ok := runtime.Caller(1); ok {
+    file = file[strings.LastIndex(file, "/")+1:]
+		funcName := runtime.FuncForPC(pc).Name()
+    handlerLog = log.WithFields(log.Fields{
+      "_src": fmt.Sprintf("%s:%s:%d", file, funcName, line),
+      "_type": "router",
+    })
+	}
 }
 
 // -------------------------------------------------------------------------- //
@@ -47,13 +54,11 @@ const dbInitQuery = `
     name VARCHAR(100),
     priority VARCHAR(100)
   ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-  INSERT INTO need (name, priority) VALUES ('partage', 'haut');
-  INSERT INTO need (name, priority) VALUES ('accomplissement personnel', 'bas');
   `
 
 func (a *Application) InitializeDB(w http.ResponseWriter, _ *http.Request) {
   if is_reachable, err := a.IsDatabaseReachable(); !is_reachable {
-    respondWithError(w, http.StatusInternalServerError, "Database is not available")
+    respondWithError(w, http.StatusInternalServerError, err.Error())
   } else {
     if _, err = a.DB.Exec(dbInitQuery); err == nil {
       payload := map[string]bool{
@@ -62,7 +67,7 @@ func (a *Application) InitializeDB(w http.ResponseWriter, _ *http.Request) {
       respondWithJSON(w, http.StatusOK, payload)
     } else {
       handlerLog.Info(err)
-      respondWithError(w, http.StatusInternalServerError, "Database is not initializable")
+      respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Database is not initializable - Error: %s", err.Error()))
     }
   }
 }
@@ -70,21 +75,34 @@ func (a *Application) InitializeDB(w http.ResponseWriter, _ *http.Request) {
 // -------------------------------------------------------------------------- //
 
 func (a *Application) isHealthy(w http.ResponseWriter, _ *http.Request) {
-  handlerLog.Info("health")
   w.WriteHeader(http.StatusOK)
 }
 
 func (a *Application) isReady(w http.ResponseWriter, r *http.Request) {
   http_status := http.StatusOK
 
-  if is_reachable, _ := a.IsDatabaseReachable(); !is_reachable {
+  if is_reachable, err := a.IsDatabaseReachable(); !is_reachable {
     http_status = http.StatusInternalServerError
-    handlerLog.Warn("Mysql server is not available")
+    log.Debug(err.Error())
+
+    // if (err.Error() == "Database connection is not set-up") {
+    //   handlerLog.Info(fmt.Sprintf("Self-healing: trying to re-etablish Database server connection after error: %s"), err.Error())
+    //   a.initializeDatabaseConnection()
+    // } else {
+    //   handlerLog.Error(err.Error())
+    // }
   }
 
-  if is_reachable, _ := a.IsMessagingReachable(); !is_reachable {
+  if is_reachable, err := a.IsMessagingReachable(); !is_reachable {
     http_status = http.StatusInternalServerError
-    handlerLog.Warn("Rabbitmq server is nor available")
+    log.Debug(err.Error())
+
+    if (err.Error() == "Messaging connection is not set-up") {
+      handlerLog.Info("Self-healing: trying to re-etablish Messaging server connection")
+      a.initializeMessagingConnection()
+    } else {
+      handlerLog.Error(err.Error())
+    }
   }
 
   w.WriteHeader(http_status)

@@ -3,6 +3,7 @@ package internal
 import (
   amqp    "github.com/streadway/amqp"
   context "context"
+  errors  "errors"
   fmt     "fmt"
   http    "net/http"
   log     "github.com/sirupsen/logrus"
@@ -12,7 +13,42 @@ import (
   time    "time"
 )
 
+// -------------------------------------------------------------------------- //
+// log
+
 var applicationLog *log.Entry
+
+var LogLevels = map[string]log.Level{
+  "fatal":   log.FatalLevel,
+  "error":   log.ErrorLevel,
+  "warning": log.WarnLevel,
+  "info":    log.InfoLevel,
+  "debug":   log.DebugLevel,
+}
+
+var LogFormatters = map[string]log.Formatter{
+  "development": &log.TextFormatter{},
+  "integration": &log.JSONFormatter{},
+  "production":  &log.JSONFormatter{},
+  "text":        &log.TextFormatter{},
+  "json":        &log.JSONFormatter{},
+}
+
+func (a *Application) initializeLogger() {
+  // configure log verbosity
+  log.SetLevel(LogLevels[a.Config.Verbosity])
+
+  if (a.Config.Verbosity == "debug") {
+    log.SetReportCaller(false)
+  }
+
+  // if log format is specified, configure it, else we base our choice on the environment
+  if a.Config.LogFormat != "" {
+    log.SetFormatter(LogFormatters[a.Config.LogFormat])
+  } else {
+    log.SetFormatter(LogFormatters[a.Config.Environment])
+  }
+}
 
 func init() {
   applicationLog = log.WithFields(log.Fields{
@@ -20,6 +56,9 @@ func init() {
     "_type": "system",
   })
 }
+
+// -------------------------------------------------------------------------- //
+// configuration
 
 type Configuration struct {
   Environment    string
@@ -62,36 +101,10 @@ type Application struct {
   Version *Version
 }
 
-func (a *Application) IsDatabaseReachable() (reachable bool, err error) {
-  _, err = a.DB.Query("SELECT null")
-  return (err == nil), err
-}
+// -------------------------------------------------------------------------- //
+// backends
 
-func (a *Application) IsMessagingReachable() (reachable bool, err error) {
-  channel, err := a.AMQP.Channel()
-  defer channel.Close()
-  return (err == nil), err
-}
-
-func (a *Application) Initialize() {
-  applicationLog.WithFields(log.Fields{
-    "database_host": a.Config.Database.Host,
-    "database_port": a.Config.Database.Port,
-    "database_username": a.Config.Database.Username,
-    "database_name":   a.Config.Database.Name,
-  }).Info("trying to connect to database")
-
-  a.Router = mux.NewRouter()
-
-  a.initializeDatabaseConnection()
-  a.initializeAMQPConnection()
-  a.initializeLogger()
-  a.initializeRoutes()
-
-  applicationLog.Info("application is initialized")
-}
-
-func (a* Application) initializeAMQPConnection() {
+func (a* Application) initializeMessagingConnection() {
   amqp_connection_parameters := fmt.Sprintf(
     "amqp://%s:%s@%s:%s/",
     a.Config.Rabbitmq.Username,
@@ -108,19 +121,28 @@ func (a* Application) initializeAMQPConnection() {
   }
 }
 
+func (a *Application) IsMessagingReachable() (reachable bool, err error) {
+  if (a.AMQP == nil) {
+    return false, errors.New("Messaging connection is not set-up")
+  }
+
+  channel, err := a.AMQP.Channel()
+  if (err != nil) {
+    return false, errors.New(fmt.Sprintf("Messaging is not available - Error: %s", err.Error()))
+  }
+
+  defer channel.Close()
+
+  return true, nil
+}
+
 func (a* Application) initializeDatabaseConnection() {
   dbDriver   := "mysql"
-
-  dbHost     := a.Config.Database.Host
-  dbPort     := a.Config.Database.Port
-  dbUser     := a.Config.Database.Username
-  dbPassword := a.Config.Database.Password
-  dbName     := a.Config.Database.Name
   dbCharset  := "charset=utf8mb4&collation=utf8mb4_unicode_ci"
 
   var err error
 
-  a.DB, err = sql.Open(dbDriver, dbUser + ":" + dbPassword + "@tcp(" + dbHost + ":" + dbPort + ")/" + dbName + "?" + dbCharset)
+  a.DB, err = sql.Open(dbDriver, a.Config.Database.Username + ":" + a.Config.Database.Password + "@tcp(" + a.Config.Database.Host + ":" + a.Config.Database.Port + ")/" + a.Config.Database.Name + "?" + dbCharset)
   if err != nil {
     applicationLog.Error("Database server is not available")
   }
@@ -130,51 +152,21 @@ func (a* Application) initializeDatabaseConnection() {
   a.DB.SetConnMaxLifetime(3600 * time.Second)
 }
 
-func (a *Application) initializeLogger() {
-  switch a.Config.Verbosity {
-  case "fatal":
-    log.SetLevel(log.FatalLevel)
-  case "error":
-    log.SetLevel(log.ErrorLevel)
-  case "warning":
-    log.SetLevel(log.WarnLevel)
-  case "info":
-    log.SetLevel(log.InfoLevel)
-  case "debug":
-    log.SetLevel(log.DebugLevel)
-    log.SetReportCaller(false)
-  default:
-    log.WithFields(
-      log.Fields{"verbosity": a.Config.Verbosity},
-    ).Fatal("Unkown verbosity level")
+func (a *Application) IsDatabaseReachable() (reachable bool, err error) {
+  if (a.DB == nil) {
+    return false, errors.New("Database connection is not set-up")
   }
 
-  switch a.Config.Environment {
-  case "development":
-    log.SetFormatter(&log.TextFormatter{})
-  case "integration":
-    log.SetFormatter(&log.JSONFormatter{})
-  case "production":
-    log.SetFormatter(&log.JSONFormatter{})
-  default:
-    log.WithFields(
-      log.Fields{"environment": a.Config.Environment},
-    ).Fatal("Unkown environment type")
+  _, err = a.DB.Query("SELECT null")
+  if (err != nil) {
+    return false, errors.New(fmt.Sprintf("Database is not available - Error: %s", err.Error()))
   }
 
-  if a.Config.LogFormat != "unset" {
-    switch a.Config.LogFormat {
-    case "text":
-      log.SetFormatter(&log.TextFormatter{})
-    case "json":
-      log.SetFormatter(&log.JSONFormatter{})
-    default:
-      log.WithFields(
-        log.Fields{"log_format": a.Config.LogFormat},
-      ).Fatal("Unkown log format")
-    }
-  }
+  return true, nil
 }
+
+// -------------------------------------------------------------------------- //
+// router
 
 func (a *Application) initializeRoutes() {
   // application need-related routes
@@ -188,6 +180,27 @@ func (a *Application) initializeRoutes() {
   a.Router.HandleFunc("/ready", a.isReady).Methods("GET")
   // application maintenance routes
   a.Router.HandleFunc("/initialize_db", a.InitializeDB).Methods("GET")
+}
+
+// -------------------------------------------------------------------------- //
+// application
+
+func (a *Application) Initialize() {
+  applicationLog.WithFields(log.Fields{
+    "database_host": a.Config.Database.Host,
+    "database_port": a.Config.Database.Port,
+    "database_username": a.Config.Database.Username,
+    "database_name":   a.Config.Database.Name,
+  }).Info("trying to connect to database")
+
+  a.Router = mux.NewRouter()
+
+  a.initializeDatabaseConnection()
+  a.initializeMessagingConnection()
+  a.initializeLogger()
+  a.initializeRoutes()
+
+  applicationLog.Info("application is initialized")
 }
 
 func (a *Application) Run(ctx context.Context) {

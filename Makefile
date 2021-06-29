@@ -43,7 +43,7 @@ only-application:
 	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow needys-api-need needys-api-need-initialize-db
 
 only-services:
-	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach postgres
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach mariadb rabbitmq
 
 ## stack - stop the entire stack
 stop:
