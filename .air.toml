@@ -14,7 +14,7 @@ bin = "tmp/app"
 
 # Customize binary.
 # This is how you start to run your application. Since my application will works like CLI, so to run it, like to make a CLI call.
-full_bin = "./needys-api-need --server.host 0.0.0.0 --rabbitmq.host rabbitmq --database.host mariadb --environment development --verbosity debug --log-healthcheck"
+full_bin = "./needys-api-need --server.host 0.0.0.0 --messaging.host rabbitmq --database.host mariadb --environment development --verbosity debug --log-healthcheck"
 
 # This log file places in your tmp_dir.
 log = "air_errors.log"
