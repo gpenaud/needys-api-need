@@ -1,16 +1,18 @@
 package internal
 
 import (
-  amqp    "github.com/streadway/amqp"
-  context "context"
-  errors  "errors"
-  fmt     "fmt"
-  http    "net/http"
-  log     "github.com/sirupsen/logrus"
-  _       "github.com/lib/pq"
-  mux     "github.com/gorilla/mux"
-  sql     "database/sql"
-  time    "time"
+  amqp          "github.com/streadway/amqp"
+  context       "context"
+  fmt           "fmt"
+  healthcheck   "github.com/hellofresh/health-go/v4"
+  http          "net/http"
+  log           "github.com/sirupsen/logrus"
+  _             "github.com/lib/pq"
+  mux           "github.com/gorilla/mux"
+  databasecheck "github.com/hellofresh/health-go/v4/checks/mysql"
+  httpcheck     "github.com/hellofresh/health-go/v4/checks/http"
+  sql           "database/sql"
+  time          "time"
 )
 
 // -------------------------------------------------------------------------- //
@@ -107,63 +109,37 @@ type Application struct {
 
 func (a* Application) initializeMessagingConnection() {
   amqp_connection_parameters := fmt.Sprintf(
-    "amqp://%s:%s@%s:%s/",
+    "amqp://%s:%s@%s:%s/%s",
     a.Config.Messaging.Username,
     a.Config.Messaging.Password,
     a.Config.Messaging.Host,
     a.Config.Messaging.Port,
+    a.Config.Messaging.Vhost,
   )
 
   var err error
 
   a.AMQP, err = amqp.Dial(amqp_connection_parameters)
   if err != nil {
-    applicationLog.Error("Failed to open RabbitMQ connection")
+    applicationLog.Fatal(fmt.Sprintf("Failed to open RabbitMQ connection: %s", amqp_connection_parameters))
   }
-}
-
-func (a *Application) IsMessagingReachable() (reachable bool, err error) {
-  if (a.AMQP == nil) {
-    return false, errors.New("Messaging connection is not set-up")
-  }
-
-  channel, err := a.AMQP.Channel()
-  if (err != nil) {
-    return false, errors.New(fmt.Sprintf("Messaging is not available - Error: %s", err.Error()))
-  }
-
-  defer channel.Close()
-
-  return true, nil
 }
 
 func (a* Application) initializeDatabaseConnection() {
-  dbDriver   := "mysql"
-  dbCharset  := "charset=utf8mb4&collation=utf8mb4_unicode_ci"
+  dbDriver          := "mysql"
+  dbCharset         := "charset=utf8mb4&collation=utf8mb4_unicode_ci"
+  dbConnectionQuery := a.Config.Database.Username + ":" + a.Config.Database.Password + "@tcp(" + a.Config.Database.Host + ":" + a.Config.Database.Port + ")/" + a.Config.Database.Name + "?" + dbCharset
 
   var err error
 
-  a.DB, err = sql.Open(dbDriver, a.Config.Database.Username + ":" + a.Config.Database.Password + "@tcp(" + a.Config.Database.Host + ":" + a.Config.Database.Port + ")/" + a.Config.Database.Name + "?" + dbCharset)
+  a.DB, err = sql.Open(dbDriver, dbConnectionQuery)
   if err != nil {
-    applicationLog.Error("Database server is not available")
+    applicationLog.Fatal(fmt.Sprintf("Database server is not available: %s", dbConnectionQuery))
   }
 
   a.DB.SetMaxIdleConns(3)
   a.DB.SetMaxOpenConns(10)
   a.DB.SetConnMaxLifetime(3600 * time.Second)
-}
-
-func (a *Application) IsDatabaseReachable() (reachable bool, err error) {
-  if (a.DB == nil) {
-    return false, errors.New("Database connection is not set-up")
-  }
-
-  _, err = a.DB.Query("SELECT null")
-  if (err != nil) {
-    return false, errors.New(fmt.Sprintf("Database is not available - Error: %s", err.Error()))
-  }
-
-  return true, nil
 }
 
 // -------------------------------------------------------------------------- //
@@ -176,9 +152,6 @@ func (a *Application) initializeRoutes() {
   // a.Router.HandleFunc("/need/{id:[0-9]+}", a.getNeed).Methods("GET")
   a.Router.HandleFunc("/need/{id:[0-9]+}", a.updateNeed).Methods("PUT")
   a.Router.HandleFunc("/need/{id:[0-9]+}", a.deleteNeed).Methods("DELETE")
-  // application probes routes
-  a.Router.HandleFunc("/health", a.isHealthy).Methods("GET")
-  a.Router.HandleFunc("/ready", a.isReady).Methods("GET")
   // application maintenance routes
   a.Router.HandleFunc("/initialize_db", a.InitializeDB).Methods("GET")
 }
@@ -187,12 +160,12 @@ func (a *Application) initializeRoutes() {
 // application
 
 func (a *Application) Initialize() {
-  applicationLog.WithFields(log.Fields{
-    "database_host": a.Config.Database.Host,
-    "database_port": a.Config.Database.Port,
-    "database_username": a.Config.Database.Username,
-    "database_name":   a.Config.Database.Name,
-  }).Info("trying to connect to database")
+  // applicationLog.WithFields(log.Fields{
+  //   "database_host": a.Config.Database.Host,
+  //   "database_port": a.Config.Database.Port,
+  //   "database_username": a.Config.Database.Username,
+  //   "database_name":   a.Config.Database.Name,
+  // }).Info("trying to connect to database")
 
   a.Router = mux.NewRouter()
 
@@ -230,6 +203,49 @@ commit: %s
       a.Version.Commit,
     )
 
+  // health checks
+  health, _ := healthcheck.New()
+
+  health.Register(healthcheck.Config{
+		Name:  "health-check",
+		Check: func(context.Context) error { return nil },
+	})
+
+  // live checks
+  live, _ := healthcheck.New()
+
+  live.Register(healthcheck.Config{
+		Name:      "mysql-check",
+		Timeout:   time.Second * 5,
+		SkipOnErr: false,
+		Check: databasecheck.New(databasecheck.Config{
+			DSN: fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", a.Config.Database.Username, a.Config.Database.Password, a.Config.Database.Host, a.Config.Database.Port, a.Config.Database.Name),
+		}),
+	})
+
+  live.Register(healthcheck.Config{
+		Name:      "rabbit-aliveness-check",
+		Timeout:   time.Second * 5,
+		SkipOnErr: false,
+		Check: httpcheck.New(httpcheck.Config{
+			URL: fmt.Sprintf(
+        "http://%s:%s@%s:%s/api/aliveness-test/%s", a.Config.Messaging.Username, a.Config.Messaging.Password, a.Config.Messaging.Host, "5672", a.Config.Messaging.Vhost),
+		}),
+	})
+
+  http.Handle("/health", health.Handler())
+  http.Handle("/live", live.Handler())
+
+  // expose healthcheck endpoints
+  healthcheckServer := &http.Server{
+    Addr:    "0.0.0.0:8090",
+    Handler: nil,
+  }
+
+  go func() {
+    healthcheckServer.ListenAndServe()
+  }()
+
   httpServer := &http.Server{
 		Addr:    server_address,
 		Handler: a.Router,
@@ -238,26 +254,26 @@ commit: %s
   go func() {
     // we keep this log on standard format
     log.Info(server_message)
-    applicationLog.Fatal(httpServer.ListenAndServe())
+    httpServer.ListenAndServe()
   }()
 
   <-ctx.Done()
-  applicationLog.Info("server stopped")
+  applicationLog.Info("application server stopped")
 
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		cancel()
 	}()
 
   var err error
 
-	if err = httpServer.Shutdown(ctxShutDown); err != nil {
+	if err = httpServer.Shutdown(ctxShutdown); err != nil {
     applicationLog.WithFields(log.Fields{
       "error": err,
-    }).Fatal("server shutdown failed")
+    }).Fatal("application server shutdown failed")
 	}
 
-  applicationLog.Info("server exited properly")
+  applicationLog.Info("application server exited properly")
 
 	if err == http.ErrServerClosed {
 		err = nil

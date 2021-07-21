@@ -44,7 +44,6 @@ func contains(s []string, str string) bool {
 }
 
 func registerConfiguration(a *internal.Application) {
-  log.Info("HERE")
   a.Config = &internal.Configuration{}
 
   app := &cli.App{
@@ -59,14 +58,14 @@ func registerConfiguration(a *internal.Application) {
       &cli.StringFlag{Name: "server.host", Value: "127.0.0.1", Usage: "API server host `HOST`", Destination: &a.Config.Server.Host, EnvVars: []string{"NEEDYS_API_NEED_SERVER_HOST"}},
       &cli.StringFlag{Name: "server.port", Value: "8010", Usage: "API server port `PORT`", Destination: &a.Config.Server.Port, EnvVars: []string{"NEEDYS_API_NEED_SERVER_PORT"}},
       &cli.StringFlag{Name: "database.host", Value: "127.0.0.1", Usage: "Database host `HOST`", Destination: &a.Config.Database.Host, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_HOST"}},
-      &cli.StringFlag{Name: "database.port", Value: "8010", Usage: "Database port `PORT`", Destination: &a.Config.Database.Port, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_PORT"}},
+      &cli.StringFlag{Name: "database.port", Value: "3306", Usage: "Database port `PORT`", Destination: &a.Config.Database.Port, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_PORT"}},
       &cli.StringFlag{Name: "database.username", Value: "needys", Usage: "Database user name `USERNAME`", Destination: &a.Config.Database.Username, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_USERNAME"}},
       &cli.StringFlag{Name: "database.password", Value: "needys", Usage: "Database user password `PASSWORD`", Destination: &a.Config.Database.Password, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_PASSWORD"}},
       &cli.StringFlag{Name: "database.name", Value: "needys", Usage: "Database name `NAME`", Destination: &a.Config.Database.Name, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_NAME"}},
       &cli.StringFlag{Name: "messaging.host", Value: "127.0.0.1", Usage: "Messaging host `HOST`", Destination: &a.Config.Messaging.Host, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_HOST"}},
       &cli.StringFlag{Name: "messaging.port", Value: "5672", Usage: "Messaging port `PORT`", Destination: &a.Config.Messaging.Port, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_PORT"}},
-      &cli.StringFlag{Name: "messaging.username", Value: "needys", Usage: "Messaging Username `USERNAME`", Destination: &a.Config.Messaging.Username, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_USERNAME"}},
-      &cli.StringFlag{Name: "messaging.password", Value: "needys", Usage: "Messaging password `PASSWORD`", Destination: &a.Config.Messaging.Password, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_PASSWORD"}},
+      &cli.StringFlag{Name: "messaging.username", Value: "guest", Usage: "Messaging Username `USERNAME`", Destination: &a.Config.Messaging.Username, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_USERNAME"}},
+      &cli.StringFlag{Name: "messaging.password", Value: "guest", Usage: "Messaging password `PASSWORD`", Destination: &a.Config.Messaging.Password, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_PASSWORD"}},
       &cli.StringFlag{Name: "messaging.vhost", Value: "needys", Usage: "Messaging vhost `VHOST`", Destination: &a.Config.Messaging.Vhost, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_VHOST"}},
     },
   }
@@ -109,9 +108,8 @@ func registerVersion(a *internal.Application) {
 }
 
 func main() {
-  c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
+  c := make(chan os.Signal, 1) // creation of a channel of type os.Signal
+	signal.Notify(c, os.Interrupt, syscall.SIGKILL, syscall.SIGTERM) // add 2 signals to the channel
 	ctx, cancel := context.WithCancel(context.Background())
 
   go func() {
@@ -120,11 +118,8 @@ func main() {
     mainLog.WithFields(log.Fields{
       "signal": oscall,
     }).Warn("received a system call")
-    // 
-    // a.DB.Close()
-    // a.AMQP.Close()
 
-		cancel()
+		cancel() // linked with ctx, cancel
 	}()
 
   a.Run(ctx)

@@ -8,7 +8,7 @@ BUILD_TIME  ?= $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 DOCKER_BUILD_ARGS ?= --build-arg PROJECT="${PROJECT}" --build-arg RELEASE="${RELEASE}" --build-arg COMMIT="${COMMIT}" --build-arg BUILD_TIME="${BUILD_TIME}"
 
 ## docker-compose options
-DOCKER_COMPOSE_OPTIONS ?= --file deployments/docker-compose.yml
+DOCKER_COMPOSE_OPTIONS ?= --file deployments/docker-compose.yml --file deployments/development-override.yml
 
 ## Colors
 COLOR_RESET       = $(shell tput sgr0)
@@ -33,17 +33,16 @@ help:
 		{ lastLine = $$0 }' $(MAKEFILE_LIST)
 	@printf "\n"
 
-## stack - start the entire stack in background, then follow logs
+## stack - start the entire stack in background, then follow logs type=app for only application, type=service for only service
 start:
+ifeq ($(type),application)
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build needys-api-need
+else ifeq ($(type),service)
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach mariadb rabbitmq
+else
 	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach
 	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow needys-api-need
-
-only-application:
-	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach needys-api-need needys-api-need-initialize-db
-	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow needys-api-need needys-api-need-initialize-db
-
-only-services:
-	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build --detach mariadb rabbitmq
+endif
 
 ## stack - stop the entire stack
 stop:
@@ -69,6 +68,9 @@ test-unit:
 ## test - execute all cucumber-behavior tests defined in application
 test-behavior:
 	go test -v ./... --godog.format=pretty --godog.random -race -covermode=atomic
+
+test-stack:
+	docker-compose --file deployments/docker-compose.yml up --build --detach
 
 ## docker - build the needys-api-need image
 .PHONY: build

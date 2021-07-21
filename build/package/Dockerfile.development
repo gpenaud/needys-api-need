@@ -1,6 +1,7 @@
 FROM golang:alpine
 
 LABEL maintainer="guillaume.penaud@gmail.com"
+ENV WAIT_VERSION 2.7.2
 
 RUN \
   apk add --no-cache git openssh-client curl &&\
@@ -13,5 +14,8 @@ RUN \
   chmod +x install.sh &&\
   sh install.sh &&\
   cp ./bin/air /bin/air
+
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/$WAIT_VERSION/wait /wait
+RUN chmod +x /wait
 
 CMD air

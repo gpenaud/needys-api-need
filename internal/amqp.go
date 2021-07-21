@@ -26,14 +26,14 @@ func (a* Application) SendAmqpMessages(message []byte) {
 
   conn, err := amqp.Dial(rabbitmq_connection_parameters)
   if err != nil {
-    amqpLog.Fatal("Failed to close RabbitMQ")
+    amqpLog.Error("Failed to close RabbitMQ")
   }
 
 	defer conn.Close()
 
 	ch, err := conn.Channel()
   if err != nil {
-    amqpLog.Fatal("Failed to close the channel")
+    amqpLog.Error("Failed to close the channel")
   }
 
 	defer ch.Close()

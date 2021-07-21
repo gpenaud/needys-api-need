@@ -57,57 +57,18 @@ const dbInitQuery = `
   `
 
 func (a *Application) InitializeDB(w http.ResponseWriter, _ *http.Request) {
-  if is_reachable, err := a.IsDatabaseReachable(); !is_reachable {
-    respondWithError(w, http.StatusInternalServerError, err.Error())
-  } else {
-    if _, err = a.DB.Exec(dbInitQuery); err == nil {
-      payload := map[string]bool{
-        "initialized": true,
-      }
-      respondWithJSON(w, http.StatusOK, payload)
-    } else {
-      handlerLog.Info(err)
-      respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Database is not initializable - Error: %s", err.Error()))
+  if _, err := a.DB.Exec(dbInitQuery); err == nil {
+    payload := map[string]bool{
+      "initialized": true,
     }
+    respondWithJSON(w, http.StatusOK, payload)
+  } else {
+    handlerLog.Info(err)
+    respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Database is not initializable - Error: %s", err.Error()))
   }
 }
 
 // -------------------------------------------------------------------------- //
-
-func (a *Application) isHealthy(w http.ResponseWriter, _ *http.Request) {
-  w.WriteHeader(http.StatusOK)
-}
-
-func (a *Application) isReady(w http.ResponseWriter, r *http.Request) {
-  http_status := http.StatusOK
-
-  if is_reachable, err := a.IsDatabaseReachable(); !is_reachable {
-    http_status = http.StatusInternalServerError
-    log.Debug(err.Error())
-
-    // if (err.Error() == "Database connection is not set-up") {
-    //   handlerLog.Info(fmt.Sprintf("Self-healing: trying to re-etablish Database server connection after error: %s"), err.Error())
-    //   a.initializeDatabaseConnection()
-    // } else {
-    //   handlerLog.Error(err.Error())
-    // }
-  }
-
-  if is_reachable, err := a.IsMessagingReachable(); !is_reachable {
-    http_status = http.StatusInternalServerError
-    log.Debug(err.Error())
-
-    if (err.Error() == "Messaging connection is not set-up") {
-      handlerLog.Info("Self-healing: trying to re-etablish Messaging server connection")
-      a.initializeMessagingConnection()
-    } else {
-      handlerLog.Error(err.Error())
-    }
-  }
-
-  w.WriteHeader(http_status)
-  return
-}
 
 func (a *Application) getNeeds(w http.ResponseWriter, r *http.Request) {
   need       := need.Need{}
