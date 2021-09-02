@@ -80,3 +80,6 @@ build:
 ## docker - enter into the needys-api-need container
 enter:
 	docker-compose ${DOCKER_COMPOSE_OPTIONS} exec needys-api-need /bin/sh
+
+cleanup:
+	sudo rm -rf needys-api-need tmp
