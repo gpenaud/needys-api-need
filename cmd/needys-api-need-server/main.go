@@ -10,6 +10,10 @@ import (
   syscall  "syscall"
 )
 
+// -------------------------------------------------------------------------- //
+// 1. Application Initialization
+// -------------------------------------------------------------------------- //
+
 var mainLog *log.Entry
 var a        internal.Application
 
@@ -26,7 +30,7 @@ func init() {
 }
 
 // -------------------------------------------------------------------------- //
-//                              Configuration
+// 2. Application Configuration
 // -------------------------------------------------------------------------- //
 
 var PossibleOptionValues = map[string][]string{
@@ -62,6 +66,7 @@ func registerConfiguration(a *internal.Application) {
       &cli.StringFlag{Name: "database.username", Value: "needys", Usage: "Database user name `USERNAME`", Destination: &a.Config.Database.Username, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_USERNAME"}},
       &cli.StringFlag{Name: "database.password", Value: "needys", Usage: "Database user password `PASSWORD`", Destination: &a.Config.Database.Password, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_PASSWORD"}},
       &cli.StringFlag{Name: "database.name", Value: "needys", Usage: "Database name `NAME`", Destination: &a.Config.Database.Name, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_NAME"}},
+      &cli.BoolFlag  {Name: "database.initialize", Value: false, Usage: "Initialize database", Destination: &a.Config.Database.Initialize, EnvVars: []string{"NEEDYS_API_NEED_DATABASE_INITIALIZE"}},
       &cli.StringFlag{Name: "messaging.host", Value: "127.0.0.1", Usage: "Messaging host `HOST`", Destination: &a.Config.Messaging.Host, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_HOST"}},
       &cli.StringFlag{Name: "messaging.port", Value: "5672", Usage: "Messaging port `PORT`", Destination: &a.Config.Messaging.Port, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_PORT"}},
       &cli.StringFlag{Name: "messaging.username", Value: "guest", Usage: "Messaging Username `USERNAME`", Destination: &a.Config.Messaging.Username, EnvVars: []string{"NEEDYS_API_NEED_MESSAGING_USERNAME"}},
@@ -96,7 +101,7 @@ func registerConfiguration(a *internal.Application) {
 }
 
 // -------------------------------------------------------------------------- //
-//                              Version
+// 3. Application Version
 // -------------------------------------------------------------------------- //
 
 var BuildTime = "unset"
@@ -106,6 +111,10 @@ var Release 	= "unset"
 func registerVersion(a *internal.Application) {
   a.Version = &internal.Version{BuildTime, Commit, Release}
 }
+
+// -------------------------------------------------------------------------- //
+// 4. Main function
+// -------------------------------------------------------------------------- //
 
 func main() {
   c := make(chan os.Signal, 1) // creation of a channel of type os.Signal

@@ -5,8 +5,10 @@ import (
   http    "net/http"
   json    "encoding/json"
   log     "github.com/sirupsen/logrus"
+  mux     "github.com/gorilla/mux"
   need    "github.com/gpenaud/needys-api-need/internal/need"
   runtime "runtime"
+  strconv "strconv"
   strings "strings"
 )
 
@@ -48,19 +50,11 @@ func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 // -------------------------------------------------------------------------- //
 // Maintenance handlers
 
-const dbInitQuery = `
-  CREATE TABLE IF NOT EXISTS need (
-    id INTEGER PRIMARY KEY NOT NULL AUTO_INCREMENT,
-    name VARCHAR(100),
-    priority VARCHAR(100)
-  ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-  `
-
 func (a *Application) InitializeDB(w http.ResponseWriter, _ *http.Request) {
-  if _, err := a.DB.Exec(dbInitQuery); err == nil {
-    payload := map[string]bool{
-      "initialized": true,
-    }
+  initialized, err := a.InitializeDatabase()
+
+  if (initialized) {
+    payload := map[string]bool{"initialized": initialized}
     respondWithJSON(w, http.StatusOK, payload)
   } else {
     handlerLog.Info(err)
@@ -69,6 +63,45 @@ func (a *Application) InitializeDB(w http.ResponseWriter, _ *http.Request) {
 }
 
 // -------------------------------------------------------------------------- //
+
+func (a *Application) createNeed(w http.ResponseWriter, r *http.Request) {
+  need := need.Need{}
+
+  decoder := json.NewDecoder(r.Body)
+  err := decoder.Decode(&need)
+  if err != nil {
+    respondWithError(w, http.StatusBadRequest, "The payload is invalid")
+    return
+  }
+  defer r.Body.Close()
+
+  err = need.CreateNeed(a.DB)
+
+  if err != nil {
+    respondWithError(w, http.StatusInternalServerError, err.Error())
+  } else {
+    respondWithJSON(w, http.StatusOK, need)
+  }
+}
+
+func (a *Application) getNeed(w http.ResponseWriter, r *http.Request) {
+  vars := mux.Vars(r)
+
+  id, err := strconv.Atoi(vars["id"])
+  if err != nil {
+    respondWithError(w, http.StatusBadRequest, fmt.Sprintf("The need with Id %d is invalid", id))
+    return
+  }
+
+  need := need.Need{Id: id}
+  err = need.GetNeed(a.DB)
+
+  if err != nil {
+    respondWithError(w, http.StatusInternalServerError, err.Error())
+  } else {
+    respondWithJSON(w, http.StatusOK, need)
+  }
+}
 
 func (a *Application) getNeeds(w http.ResponseWriter, r *http.Request) {
   need       := need.Need{}
@@ -81,14 +114,18 @@ func (a *Application) getNeeds(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (a *Application) createNeed(w http.ResponseWriter, r *http.Request) {
-  r.ParseForm()
+func (a *Application) updateNeed(w http.ResponseWriter, r *http.Request) {
+  need := need.Need{}
 
-  name     := r.FormValue("name")
-  priority := r.FormValue("priority")
+  decoder := json.NewDecoder(r.Body)
+  err := decoder.Decode(&need)
+  if err != nil {
+    respondWithError(w, http.StatusBadRequest, "The payload is invalid")
+    return
+  }
+  defer r.Body.Close()
 
-  need := need.Need{Name: name, Priority: priority}
-  err := need.InsertNeed(a.DB)
+  err = need.UpdateNeed(a.DB)
 
   if err != nil {
     respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -97,15 +134,11 @@ func (a *Application) createNeed(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-func (a *Application) updateNeed(w http.ResponseWriter, r *http.Request) {
-  fmt.Println(w, r)
-}
-
 func (a *Application) deleteNeed(w http.ResponseWriter, r *http.Request) {
-  name := r.URL.Query().Get("name")
-  need := need.Need{Name: name}
+  vars := mux.Vars(r)
 
-  err := need.DeleteNeed(a.DB)
+  need := need.Need{Name: vars["name"]}
+  err  := need.DeleteNeed(a.DB)
 
   if err != nil {
     respondWithError(w, http.StatusInternalServerError, err.Error())

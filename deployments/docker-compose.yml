@@ -14,26 +14,11 @@ services:
       - ./../:/application
     networks:
       - needys-api-need
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://0.0.0.0:8090/live"]
-    #   interval: 5s
-    #   timeout: 3s
-    #   retries: 20
-
-  # needys-api-need-initialize-db:
-  #   container_name: needys-api-need-initialize-db
-  #   image: curlimages/curl:7.77.0
-  #   command: --silent --fail --retry 60 --retry-delay 3 --retry-connrefused http://needys-api-need:8010/initialize_db
-  #   networks:
-  #     - needys-api-need
-  #   depends_on:
-  #     - needys-api-need
-  #   restart: on-failure
-  #   healthcheck:
-  #     test: curl --fail http://needys-api-need:8010/ready || exit 1
-  #     interval: 3s
-  #     timeout: 3s
-  #     retries: 10
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   mariadb:
     image: mariadb:10.5.1

@@ -16,7 +16,8 @@ import (
 )
 
 // -------------------------------------------------------------------------- //
-// log
+// 1. Application Logging
+// -------------------------------------------------------------------------- //
 
 var applicationLog *log.Entry
 
@@ -60,7 +61,8 @@ func init() {
 }
 
 // -------------------------------------------------------------------------- //
-// configuration
+// 2. Application Declarative Configuration
+// -------------------------------------------------------------------------- //
 
 type Configuration struct {
   Environment    string
@@ -80,6 +82,7 @@ type Configuration struct {
     Username string
     Password string
     Name string
+    Initialize bool
   }
   Messaging struct {
     Port string
@@ -105,7 +108,8 @@ type Application struct {
 }
 
 // -------------------------------------------------------------------------- //
-// backends
+// 3. Backends Initialization (MariaDB / RabbitMQ)
+// -------------------------------------------------------------------------- //
 
 func (a* Application) initializeMessagingConnection() {
   amqp_connection_parameters := fmt.Sprintf(
@@ -143,30 +147,25 @@ func (a* Application) initializeDatabaseConnection() {
 }
 
 // -------------------------------------------------------------------------- //
-// router
+// 4. Router setup
+// -------------------------------------------------------------------------- //
 
 func (a *Application) initializeRoutes() {
   // application need-related routes
   a.Router.HandleFunc("/needs", a.getNeeds).Methods("GET")
-  a.Router.HandleFunc("/need", a.createNeed).Methods("POST")
-  // a.Router.HandleFunc("/need/{id:[0-9]+}", a.getNeed).Methods("GET")
+  a.Router.HandleFunc("/need/{id:[0-9]+}", a.getNeed).Methods("GET")
+  a.Router.HandleFunc("/need", a.updateNeed).Methods("POST")
   a.Router.HandleFunc("/need/{id:[0-9]+}", a.updateNeed).Methods("PUT")
-  a.Router.HandleFunc("/need/{id:[0-9]+}", a.deleteNeed).Methods("DELETE")
+  a.Router.HandleFunc("/need/{name:[a-zA-Z]+}", a.deleteNeed).Methods("DELETE")
   // application maintenance routes
   a.Router.HandleFunc("/initialize_db", a.InitializeDB).Methods("GET")
 }
 
 // -------------------------------------------------------------------------- //
-// application
+// 5. Application Setup
+// -------------------------------------------------------------------------- //
 
 func (a *Application) Initialize() {
-  // applicationLog.WithFields(log.Fields{
-  //   "database_host": a.Config.Database.Host,
-  //   "database_port": a.Config.Database.Port,
-  //   "database_username": a.Config.Database.Username,
-  //   "database_name":   a.Config.Database.Name,
-  // }).Info("trying to connect to database")
-
   a.Router = mux.NewRouter()
 
   a.initializeDatabaseConnection()
@@ -203,6 +202,10 @@ commit: %s
       a.Version.Commit,
     )
 
+  // ---------------------------------------------------------------------------
+  // 5.1. manage healthchecks and healthchecks server
+  // ---------------------------------------------------------------------------
+
   // health checks
   health, _ := healthcheck.New()
 
@@ -229,7 +232,7 @@ commit: %s
 		SkipOnErr: false,
 		Check: httpcheck.New(httpcheck.Config{
 			URL: fmt.Sprintf(
-        "http://%s:%s@%s:%s/api/aliveness-test/%s", a.Config.Messaging.Username, a.Config.Messaging.Password, a.Config.Messaging.Host, "5672", a.Config.Messaging.Vhost),
+        "http://%s:%s@%s:%s/api/aliveness-test/%s", a.Config.Messaging.Username, a.Config.Messaging.Password, a.Config.Messaging.Host, "15672", a.Config.Messaging.Vhost),
 		}),
 	})
 
@@ -246,6 +249,10 @@ commit: %s
     healthcheckServer.ListenAndServe()
   }()
 
+  // ---------------------------------------------------------------------------
+  // 5.2. manage healthchecks and healthchecks server
+  // ---------------------------------------------------------------------------
+
   httpServer := &http.Server{
 		Addr:    server_address,
 		Handler: a.Router,
@@ -256,6 +263,26 @@ commit: %s
     log.Info(server_message)
     httpServer.ListenAndServe()
   }()
+
+  // -------------------------------------------------
+  // 5.3. initialize database if specified in configuration
+  // -------------------------------------------------
+
+  if (a.Config.Database.Initialize) {
+    initialized, err := a.InitializeDatabase()
+
+    if (initialized) {
+      applicationLog.Info("database initialisation succeeded")
+    } else {
+      applicationLog.WithFields(log.Fields{
+        "error": err,
+      }).Fatal("database initialisation failed")
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5.4. manage server shutdown
+  // ---------------------------------------------------------------------------
 
   <-ctx.Done()
   applicationLog.Info("application server stopped")

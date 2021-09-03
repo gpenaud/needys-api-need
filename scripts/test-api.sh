@@ -31,43 +31,43 @@ while true; do
 done
 
 list () {
-  echo "${COLOR_TEST}\nLIST TEST\n---------${COLOR_RESET}"
+  printf "${COLOR_TEST}\nLIST TEST\n---------${COLOR_RESET}\n"
   if [ "${log_query}" = "true" ]; then
-    echo "DEBUG: curl -i -X GET http://localhost:8011/strategies"
+    echo "DEBUG: curl -i -X GET http://localhost:8010/needs"
   fi
-  curl -i -X GET http://localhost:8011/strategies
+  curl -i -X GET http://localhost:8010/needs && printf "\n"
 }
 
 fetch () {
-  echo "${COLOR_TEST}\nFETCH TEST\n----------${COLOR_RESET}"
+  printf "${COLOR_TEST}\nFETCH TEST\n----------${COLOR_RESET}\n"
   if [ "${log_query}" = "true" ]; then
-    echo "DEBUG: No query to display yet !"
+    echo "DEBUG: curl -i -X GET http://localhost:8010/need/2"
   fi
-  echo "WARNING: The \"fetch\" test has not yet been defined !"
+  curl -i -X GET http://localhost:8010/need/2 && printf "\n"
 }
 
 create () {
-  echo "${COLOR_TEST}\nCREATE TEST\n-----------${COLOR_RESET}"
+  printf "${COLOR_TEST}\nCREATE TEST\n-----------${COLOR_RESET}\n"
   if [ "${log_query}" = "true" ]; then
-    echo "DEBUG: curl -i -H \"Content-Type: application/json\" -d '{\"description\":\"faire une bonne sieste\", \"needId\":3}' -X POST http://localhost:8011/strategy"
+    echo "DEBUG: curl -i -H \"Content-Type: application/json\" -d '{\"name\":\"sex\", \"priority\":\"very high\"}' -X POST http://localhost:8010/need"
   fi
-  curl -i -H "Content-Type: application/json" -d '{"description":"faire une bonne sieste", "needId":3}' -X POST http://localhost:8011/strategy
+  curl -i -H "Content-Type: application/json" -d '{"name":"sex", "priority":"very high"}' -X POST http://localhost:8010/need && printf "\n"
 }
 
 update () {
-  echo "${COLOR_TEST}\nUPDATE TEST\n-----------${COLOR_RESET}"
+  printf "${COLOR_TEST}\nUPDATE TEST\n-----------${COLOR_RESET}\n"
   if [ "${log_query}" = "true" ]; then
-    echo "DEBUG: No query to display yet !"
+    echo "DEBUG: curl -i -X POST -d '{\"Name\":\"rest\",\"Priority\":\"huge\"}' http://localhost:8010/need"
   fi
-  echo "WARNING: The \"update\" test has not yet been defined !"
+  curl -i -X POST -d '{"Name":"rest","Priority":"huge"}' http://localhost:8010/need && printf "\n"
 }
 
 delete () {
-  echo "${COLOR_TEST}\nDELETE TEST\n-----------${COLOR_RESET}"
+  printf "${COLOR_TEST}\nDELETE TEST\n-----------${COLOR_RESET}\n"
   if [ "${log_query}" = "true" ]; then
-    echo "DEBUG: No query to display yet !"
+    echo "DEBUG: curl -i -X DELETE http://localhost:8010/need/sex"
   fi
-  echo "WARNING: The \"delete\" test has not yet been defined !"
+  curl -i -X DELETE http://localhost:8010/need/sex && printf "\n"
 }
 
 if [ "${action}" = "list" ]; then
