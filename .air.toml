@@ -7,7 +7,7 @@ tmp_dir = "/tmp"
 
 [build]
 # Just plain old shell command. You could use `make` as well.
-cmd = "go build -ldflags \"-s -w -X github.com/gpenaud/needys-api-need/version.Release=development -X github.com/gpenaud/needys-api-need/version.Commit=000000 -X github.com/gpenaud/needys-api-need/version.BuildTime=0001-01-01_00:00:01 \" -o ./needys-api-need ./cmd/needys-api-need-server/main.go"
+cmd = "go build -ldflags \"-s -w -X main.Release=development -X main.Commit=000000 -X main.BuildTime=0001-01-01_00:00:01 \" -o ./needys-api-need ./cmd/needys-api-need-server/main.go"
 
 # Binary file yields from `cmd`.
 bin = "tmp/app"

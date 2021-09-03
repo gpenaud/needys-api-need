@@ -44,6 +44,11 @@ else
 	docker-compose ${DOCKER_COMPOSE_OPTIONS} logs --follow needys-api-need
 endif
 
+## stack - rebuild and restart needys-api-need
+rebuild:
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} stop needys-api-need
+	docker-compose ${DOCKER_COMPOSE_OPTIONS} up --build needys-api-need
+
 ## stack - stop the entire stack
 stop:
 	docker-compose ${DOCKER_COMPOSE_OPTIONS} down
